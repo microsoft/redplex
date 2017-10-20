@@ -13,15 +13,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Writable is an interface passed into Pubsub. It's called when we want to
+// publish data.
+type Writable interface {
+	Write(b []byte)
+}
+
 // The Listener wraps a function that's called when a pubsub message it sent.
 type Listener struct {
 	IsPattern bool
 	Channel   string
-	Conn      *connection
+	Conn      Writable
 }
 
 // listenerMap is a map of patterns or channels to Listeners.
-type listenerMap map[string][]*connection
+type listenerMap map[string][]Writable
 
 // broadcast pushes the byte slice asynchronously to the list of listeners.
 // Blocks until all listeners have been called.
@@ -31,13 +37,13 @@ func (l listenerMap) broadcast(pattern []byte, b []byte) {
 	var wg sync.WaitGroup
 	wg.Add(len(listeners))
 	for _, l := range listeners {
-		go func() { l.write(b); wg.Done() }()
+		go func(l Writable) { l.Write(b); wg.Done() }(l)
 	}
 	wg.Wait()
 }
 
 // add inserts the listener into the pattern's set of listeners.
-func (l listenerMap) add(channel string, listener *connection) (shouldSubscribe bool) {
+func (l listenerMap) add(channel string, listener Writable) (shouldSubscribe bool) {
 	list := l[channel]
 	shouldSubscribe = len(list) == 0
 	l[channel] = append(list, listener)
@@ -45,7 +51,7 @@ func (l listenerMap) add(channel string, listener *connection) (shouldSubscribe 
 }
 
 // remove pulls the listener out of the map.
-func (l listenerMap) remove(channel string, listener *connection) (shouldUnsubscribe bool) {
+func (l listenerMap) remove(channel string, listener Writable) (shouldUnsubscribe bool) {
 	list := l[channel]
 	changed := false
 	for i, other := range list {
@@ -72,7 +78,7 @@ func (l listenerMap) remove(channel string, listener *connection) (shouldUnsubsc
 }
 
 // removeAll removes all channels the listener is connected to.
-func (l listenerMap) removeAll(conn *connection, p *Pubsub) (toUnsub [][]byte) {
+func (l listenerMap) removeAll(conn Writable) (toUnsub [][]byte) {
 	for channel, list := range l {
 		for i := 0; i < len(list); i++ {
 			if list[i] == conn {
@@ -112,6 +118,7 @@ func NewPubsub(dialer Dialer, writeTimeout time.Duration) *Pubsub {
 		writeTimeout: writeTimeout,
 		patterns:     listenerMap{},
 		channels:     listenerMap{},
+		closer:       make(chan struct{}),
 	}
 }
 
@@ -122,34 +129,48 @@ func (p *Pubsub) Start() {
 
 	for {
 		cnx, err := p.dial()
-		if err == nil {
-			backoff.Reset()
-			if err := p.read(cnx); err != nil {
-				logrus.WithError(err).Info("redplex/pubsub: lost connection to pubsub server")
+		if err != nil {
+			logrus.WithError(err).Info("redplex/pubsub: error dialing to pubsub master")
+			select {
+			case <-time.After(backoff.NextBackOff()):
+				continue
+			case <-p.closer:
+				return
 			}
-			continue
 		}
 
-		logrus.WithError(err).Info("redplex/pubsub: error dialing to pubsub master")
+		backoff.Reset()
+		err = p.read(cnx)
 
 		select {
-		case <-time.After(backoff.NextBackOff()):
 		case <-p.closer:
 			return
+		default:
+			logrus.WithError(err).Info("redplex/pubsub: lost connection to pubsub server")
 		}
 	}
+}
+
+// Close frees resources associated with the pubsub server.
+func (p *Pubsub) Close() {
+	close(p.closer)
+	p.mu.Lock()
+	if p.connection != nil {
+		p.connection.Close()
+	}
+	p.mu.Unlock()
 }
 
 // Subscribe adds the listener to the channel.
 func (p *Pubsub) Subscribe(listener Listener) {
 	p.mu.Lock()
 	if listener.IsPattern {
-		if p.patterns.add(listener.Channel, listener.Conn) && p.connection != nil {
-			p.command(NewRequest(commandPSubscribe, 1).Append([]byte(listener.Channel)))
+		if p.patterns.add(listener.Channel, listener.Conn) {
+			p.command(NewRequest(commandPSubscribe, 1).Bulk([]byte(listener.Channel)))
 		}
 	} else {
-		if p.channels.add(listener.Channel, listener.Conn) && p.connection != nil {
-			p.command(NewRequest(commandSubscribe, 1).Append([]byte(listener.Channel)))
+		if p.channels.add(listener.Channel, listener.Conn) {
+			p.command(NewRequest(commandSubscribe, 1).Bulk([]byte(listener.Channel)))
 		}
 	}
 	p.mu.Unlock()
@@ -159,45 +180,66 @@ func (p *Pubsub) Subscribe(listener Listener) {
 func (p *Pubsub) Unsubscribe(listener Listener) {
 	p.mu.Lock()
 	if listener.IsPattern {
-		if p.patterns.remove(listener.Channel, listener.Conn) && p.connection != nil {
-			p.command(NewRequest(commandPUnsubscribe, 1).Append([]byte(listener.Channel)))
+		if p.patterns.remove(listener.Channel, listener.Conn) {
+			p.command(NewRequest(commandPUnsubscribe, 1).Bulk([]byte(listener.Channel)))
 		}
 	} else {
-		if p.channels.remove(listener.Channel, listener.Conn) && p.connection != nil {
-			p.command(NewRequest(commandUnsubscribe, 1).Append([]byte(listener.Channel)))
+		if p.channels.remove(listener.Channel, listener.Conn) {
+			p.command(NewRequest(commandUnsubscribe, 1).Bulk([]byte(listener.Channel)))
 		}
 	}
 	p.mu.Unlock()
 }
 
 // UnsubscribeAll removes all channels the writer is subscribed to.
-func (p *Pubsub) UnsubscribeAll(c *connection) {
-	toUnsub := p.patterns.removeAll(c, p)
+func (p *Pubsub) UnsubscribeAll(c Writable) {
+	p.mu.Lock()
+
+	var (
+		toUnsub = p.patterns.removeAll(c)
+		command []byte
+	)
+
 	if len(toUnsub) > 0 {
 		r := NewRequest(commandPUnsubscribe, len(toUnsub))
 		for _, p := range toUnsub {
-			r.Append(p)
+			r.Bulk(p)
 		}
 
-		p.command(r)
+		command = append(command, r.Bytes()...)
 	}
 
-	toUnsub = p.channels.removeAll(c, p)
+	toUnsub = p.channels.removeAll(c)
 	if len(toUnsub) > 0 {
 		r := NewRequest(commandUnsubscribe, len(toUnsub))
 		for _, p := range toUnsub {
-			r.Append(p)
+			r.Bulk(p)
 		}
 
-		p.command(r)
+		command = append(command, r.Bytes()...)
 	}
+
+	if p.connection != nil && len(command) > 0 {
+		p.connection.SetWriteDeadline(time.Now().Add(p.writeTimeout))
+		go p.connection.Write(command)
+	}
+
+	p.mu.Unlock()
 }
 
-// command sends the request to the pubsub server.
+// command sends the request to the pubsub server asynchonrously.
 func (p *Pubsub) command(r *Request) {
 	if p.connection != nil {
 		p.connection.SetWriteDeadline(time.Now().Add(p.writeTimeout))
 		go p.connection.Write(r.Bytes())
+	}
+}
+
+// command sends the request to the pubsub server and blocks until it sends.
+func (p *Pubsub) commandSync(r *Request) {
+	if p.connection != nil {
+		p.connection.SetWriteDeadline(time.Now().Add(p.writeTimeout))
+		p.connection.Write(r.Bytes())
 	}
 }
 
@@ -208,17 +250,17 @@ func (p *Pubsub) resubscribe(cnx net.Conn) {
 	if len(p.channels) > 0 {
 		cmd := NewRequest(commandSubscribe, len(p.channels))
 		for channel := range p.channels {
-			cmd.Append([]byte(channel))
+			cmd.Bulk([]byte(channel))
 		}
-		p.command(cmd)
+		p.commandSync(cmd)
 	}
 
 	if len(p.patterns) > 0 {
 		cmd := NewRequest(commandPSubscribe, len(p.patterns))
 		for pattern := range p.patterns {
-			cmd.Append([]byte(pattern))
+			cmd.Bulk([]byte(pattern))
 		}
-		p.command(cmd)
+		p.commandSync(cmd)
 	}
 
 	p.mu.Unlock()
@@ -238,11 +280,9 @@ func (p *Pubsub) read(cnx net.Conn) error {
 	for {
 		buffer.Reset()
 		if err := ReadNextFull(buffer, reader); err != nil {
-			logrus.WithError(err).Debug("redplex/protocol: error reading from remote")
 			p.mu.Lock()
 			p.connection = nil
 			p.mu.Unlock()
-
 			return err
 		}
 

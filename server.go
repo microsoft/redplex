@@ -17,6 +17,8 @@ const toSendQueueLimit = 128
 // the pubsub master.
 type Dialer func() (net.Conn, error)
 
+// Server is the redplex server which accepts connections and talks to the
+// underlying Pubsub implementation.
 type Server struct {
 	l      net.Listener
 	pubsub *Pubsub
@@ -47,6 +49,12 @@ func (s *Server) Listen() error {
 			toSend:     make([][]byte, 0, toSendQueueLimit),
 		}).Start()
 	}
+}
+
+// Close frees resources associated with the server.
+func (s *Server) Close() {
+	s.l.Close()
+	s.pubsub.Close()
 }
 
 type connection struct {
@@ -101,7 +109,7 @@ func (s *connection) Start() {
 			logrus.Debug("redplex/server: terminating connection at client's request")
 			return
 		default:
-			s.cnx.Write([]byte(fmt.Sprintf("-ERR unknown command '%s'", method)))
+			s.cnx.Write([]byte(fmt.Sprintf("-ERR unknown command '%s'\r\n", method)))
 			continue
 		}
 
@@ -131,7 +139,8 @@ func (s *connection) loopWrite() {
 	}
 }
 
-func (s *connection) write(b []byte) {
+// Write implements Writable.Write.
+func (s *connection) Write(b []byte) {
 	s.toSendCond.L.Lock()
 	if len(s.toSend) < cap(s.toSend) && !s.isClosed {
 		s.toSend = append(s.toSend, b)

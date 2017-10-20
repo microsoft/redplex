@@ -30,8 +30,6 @@ _testmain.go
 
 /.idea
 /vendor/*/
-/node_modules
 /redplex
 /bench
-/x.js
 *.profile

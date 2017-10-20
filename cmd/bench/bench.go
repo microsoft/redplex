@@ -18,7 +18,7 @@ import (
 
 var (
 	benchData      = []byte("*3\r\n$7\r\nmessage\r\n$7\r\nchannel\r\n$345\r\n" + `{"channel":314,"id":"fd269030-aacd-11e7-b70f-fd0fddd98285","user_name":"Jeff","user_id":1355,"user_roles":["Pro","User"],"user_level":94,"user_avatar":"https://uploads.beam.pro/avatar/qryjcpn1-1355.jpg","message":{"message":[{"type":"text","data":"Finally. We're back on the computer.","text":"Finally. We're back on the computer."}],"meta":{}}}` + "\r\n")
-	subscribe      = redplex.NewRequest("subscribe", 1).Append([]byte(`channel`)).Bytes()
+	subscribe      = redplex.NewRequest("subscribe", 1).Bulk([]byte(`channel`)).Bytes()
 	remoteAddress  = "127.0.0.1:3100"
 	redplexAddress = "127.0.0.1:3101"
 	benchedBytes   = 1024 * 1024 * 10

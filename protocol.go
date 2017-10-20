@@ -10,11 +10,20 @@ import (
 )
 
 const (
-	MessageError  = '-'
+	// MessageError is the prefix for Redis line errors in the protocol.
+	MessageError = '-'
+	// MessageStatus is the prefix for Redis line statues in the protocol.
 	MessageStatus = '+'
-	MessageInt    = ':'
-	MessageBulk   = '$'
-	MessageMutli  = '*'
+	// MessageInt is the prefix for Redis line integers in the protocol.
+	// It's followed by the plain text number
+	MessageInt = ':'
+	// MessageBulk is the prefix for Redis bulk messages. It's followed by the
+	// bulk message size, and CRLF, and then the full bulk message bytes.
+	MessageBulk = '$'
+	// MessageMutli   is the prefix for Redis "multi" messages (arrays).
+	// It's followed by the array length, and CRLF, and then the next N messages
+	// as elements of the array/
+	MessageMutli = '*'
 )
 
 var (
@@ -24,9 +33,9 @@ var (
 	messagePrefix = []byte("*3\r\n$7\r\nmessage\r\n")
 	// pmessagePrefix is the prefix for pattern pubsub messages on the protocol.
 	pmessagePrefix = []byte("*4\r\n$8\r\npmessage\r\n")
-	// WrongMessageErr is returned in Parse commands if the command
+	// ErrWrongMessage is returned in Parse commands if the command
 	// is not a pubsub command.
-	WrongMessageErr = errors.New("redplex/protocol: unexpected message type")
+	ErrWrongMessage = errors.New("redplex/protocol: unexpected message type")
 
 	commandSubscribe    = `subscribe`
 	commandPSubscribe   = `psubscribe`
@@ -96,7 +105,7 @@ type PublishCommand struct {
 // trailing delimiter.
 func ParseBulkMessage(line []byte) ([]byte, error) {
 	if line[0] != MessageBulk {
-		return nil, WrongMessageErr
+		return nil, ErrWrongMessage
 	}
 
 	delimiter := bytes.IndexByte(line, '\n')
@@ -105,15 +114,19 @@ func ParseBulkMessage(line []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if n <= 0 {
+		return nil, nil
+	}
+
 	if len(line) <= delimiter+1+int(n) {
-		return nil, WrongMessageErr
+		return nil, ErrWrongMessage
 	}
 
 	return line[delimiter+1 : delimiter+1+int(n)], nil
 }
 
-// Parses the given pubsub command efficiently. Returns a NotPubsubError if the
-// command isn't a pubsub command.
+// ParsePublishCommand parses the given pubsub command efficiently. Returns a
+// NotPubsubError if the command isn't a pubsub command.
 func ParsePublishCommand(b []byte) (cmd PublishCommand, err error) {
 	switch {
 	case bytes.HasPrefix(b, messagePrefix):
@@ -130,11 +143,11 @@ func ParsePublishCommand(b []byte) (cmd PublishCommand, err error) {
 		}
 		return PublishCommand{IsPattern: true, ChannelOrPattern: name}, nil
 	default:
-		return cmd, WrongMessageErr
+		return cmd, ErrWrongMessage
 	}
 }
 
-// SubscribeCommand is a command to subscribe to one or more Redis channels.
+// Request is a byte slice with utility methods for building up Redis commands.
 type Request []byte
 
 // NewRequest creates a new request to send to the Redis server.
@@ -143,16 +156,27 @@ func NewRequest(name string, argCount int) *Request {
 	b = append(b, []byte(strconv.Itoa(argCount+1))...)
 	b = append(b, messageDelimiter...)
 	r := Request(b)
-	return (&r).Append([]byte(name))
+	return (&r).Bulk([]byte(name))
 }
 
-// Append adds a new argument value to the request.
-func (r *Request) Append(arg []byte) *Request {
+// Bulk adds a new bulk argument value to the request.
+func (r *Request) Bulk(arg []byte) *Request {
 	data := *r
 	data = append(data, MessageBulk)
 	data = append(data, []byte(strconv.Itoa(len(arg)))...)
 	data = append(data, messageDelimiter...)
 	data = append(data, arg...)
+	data = append(data, messageDelimiter...)
+
+	*r = data
+	return r
+}
+
+// Int adds a new integer argument value to the request.
+func (r *Request) Int(n int) *Request {
+	data := *r
+	data = append(data, MessageInt)
+	data = append(data, []byte(strconv.Itoa(n))...)
 	data = append(data, messageDelimiter...)
 
 	*r = data
@@ -210,5 +234,5 @@ func copyBytes(b []byte) (dup []byte) {
 // SubscribeResponse returns an appropriate response to the given subscribe
 // or unsubscribe command.
 func SubscribeResponse(command string, channel []byte) []byte {
-	return NewRequest(command, 2).Append(channel).Append([]byte(`:1`)).Bytes()
+	return NewRequest(command, 2).Bulk(channel).Int(1).Bytes()
 }
