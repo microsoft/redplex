@@ -1,0 +1,97 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "Ba9moJKp0ssS+S7v2Zhl0zVmV6U=",
+			"path": "github.com/FZambia/go-sentinel",
+			"revision": "7ec87ec3f92e789de83d4d4a17a5cd069bd2882f",
+			"revisionTime": "2017-09-08T19:10:20Z"
+		},
+		{
+			"checksumSHA1": "KmjnydoAbofMieIWm+it5OWERaM=",
+			"path": "github.com/alecthomas/template",
+			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",
+			"revisionTime": "2016-04-05T07:15:01Z"
+		},
+		{
+			"checksumSHA1": "3wt0pTXXeS+S93unwhGoLIyGX/Q=",
+			"path": "github.com/alecthomas/template/parse",
+			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",
+			"revisionTime": "2016-04-05T07:15:01Z"
+		},
+		{
+			"checksumSHA1": "fCc3grA7vIxfBru7R3SqjcW+oLI=",
+			"path": "github.com/alecthomas/units",
+			"revision": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a",
+			"revisionTime": "2015-10-22T06:55:26Z"
+		},
+		{
+			"checksumSHA1": "GWJsUGyqiChR6BM7ZR2GSZ+1sY0=",
+			"path": "github.com/cenkalti/backoff",
+			"revision": "61ba96c4d1002f22e06acb8e34a7650611125a63",
+			"revisionTime": "2017-09-19T12:10:20Z"
+		},
+		{
+			"checksumSHA1": "nZSBUg/MfVC82n2cKc713xKhQiQ=",
+			"path": "github.com/docker/go-redis-server",
+			"revision": "e4d48d56d17845ed199548a5366406de7231a4b8",
+			"revisionTime": "2013-08-30T20:48:22Z"
+		},
+		{
+			"checksumSHA1": "2UmMbNHc8FBr98mJFN1k8ISOIHk=",
+			"path": "github.com/garyburd/redigo/internal",
+			"revision": "34a326de1fea52965fa5ad664d3fc7163dd4b0a1",
+			"revisionTime": "2017-10-09T00:43:22Z"
+		},
+		{
+			"checksumSHA1": "oBN4RLzCF91Zehon4gALT+ZerKs=",
+			"path": "github.com/garyburd/redigo/redis",
+			"revision": "34a326de1fea52965fa5ad664d3fc7163dd4b0a1",
+			"revisionTime": "2017-10-09T00:43:22Z"
+		},
+		{
+			"checksumSHA1": "zcqzAha7CiVPN+wzm+rjySACre8=",
+			"path": "github.com/quorzz/redis-protocol",
+			"revision": "8cdae60e7b8a0435899eeeee0f40f2d2cd495aa3",
+			"revisionTime": "2016-08-07T03:44:21Z"
+		},
+		{
+			"checksumSHA1": "BYvROBsiyAXK4sq6yhDe8RgT4LM=",
+			"path": "github.com/sirupsen/logrus",
+			"revision": "89742aefa4b206dcf400792f3bd35b542998eb3b",
+			"revisionTime": "2017-08-22T13:27:46Z"
+		},
+		{
+			"checksumSHA1": "nqWNlnMmVpt628zzvyo6Yv2CX5Q=",
+			"path": "golang.org/x/crypto/ssh/terminal",
+			"revision": "959b3afb35f6a769732990dceca09da087ee47f5",
+			"revisionTime": "2017-10-16T13:58:10Z"
+		},
+		{
+			"checksumSHA1": "dr5+PfIRzXeN+l1VG+s0lea9qz8=",
+			"path": "golang.org/x/net/context",
+			"revision": "aabf50738bcdd9b207582cbe796b59ed65d56680",
+			"revisionTime": "2017-10-18T12:46:33Z"
+		},
+		{
+			"checksumSHA1": "FUo16zuO20jOcdCUu0IgiF51koE=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "8dbc5d05d6edcc104950cc299a1ce6641235bc86",
+			"revisionTime": "2017-10-13T13:31:29Z"
+		},
+		{
+			"checksumSHA1": "wGkVl9xZjgnLs/olurjDX2Yg8Xw=",
+			"path": "golang.org/x/sys/windows",
+			"revision": "8dbc5d05d6edcc104950cc299a1ce6641235bc86",
+			"revisionTime": "2017-10-13T13:31:29Z"
+		},
+		{
+			"checksumSHA1": "3SZTatHIy9OTKc95YlVfXKnoySg=",
+			"path": "gopkg.in/alecthomas/kingpin.v2",
+			"revision": "1087e65c9441605df944fb12c33f0fe7072d18ca",
+			"revisionTime": "2017-07-27T04:22:29Z"
+		}
+	],
+	"rootPath": "github.com/mixer/redplex"
+}
