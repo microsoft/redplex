@@ -76,8 +76,10 @@ func (s *connection) Start() {
 		s.toSendCond.Broadcast()
 		s.toSendCond.L.Unlock()
 		s.pubsub.UnsubscribeAll(s)
+		clientsCount.Dec()
 	}()
 
+	clientsCount.Inc()
 	logrus.Debug("redplex/server: accepted connection")
 	go s.loopWrite()
 

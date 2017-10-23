@@ -2,6 +2,8 @@ package main
 
 import (
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,6 +11,7 @@ import (
 	"github.com/FZambia/go-sentinel"
 	"github.com/garyburd/redigo/redis"
 	"github.com/mixer/redplex"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
@@ -22,6 +25,7 @@ var (
 	logLevel       = kingpin.Flag("log-level", "Log level (one of debug, info, warn, error").Default("info").String()
 	dialTimeout    = kingpin.Flag("dial-timeout", "Timeout connecting to Redis").Default("10s").Duration()
 	writeTimeout   = kingpin.Flag("write-timeout", "Timeout during write operations").Default("2s").Duration()
+	pprofServer    = kingpin.Flag("pprof-server", "Address to bind a pprof server on. Not bound if empty.").String()
 )
 
 func main() {
@@ -55,6 +59,8 @@ func main() {
 		listener.Close()
 	}()
 
+	go startPprof()
+
 	logrus.Debugf("redplex/main: listening on %s://%s", *network, *address)
 	if err := redplex.NewServer(listener, redplex.NewPubsub(dialer, *writeTimeout)).Listen(); err != nil {
 		select {
@@ -63,6 +69,18 @@ func main() {
 		default:
 			logrus.WithError(err).Fatal("redplex/main: error accepting incoming connections")
 		}
+	}
+}
+
+func startPprof() {
+	if *pprofServer == "" {
+		return
+	}
+
+	http.Handle("/stats", promhttp.Handler())
+
+	if err := http.ListenAndServe(*pprofServer, nil); err != nil {
+		logrus.WithError(err).Error("redplex/main: could not start pprof server")
 	}
 }
 

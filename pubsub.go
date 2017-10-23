@@ -34,6 +34,10 @@ type listenerMap map[string][]Writable
 func (l listenerMap) broadcast(pattern []byte, b []byte) {
 	listeners := l[string(pattern)]
 
+	count := float64(len(listeners))
+	throughputMessages.Add(count)
+	throughputBytes.Add(count * float64(len(b)))
+
 	var wg sync.WaitGroup
 	wg.Add(len(listeners))
 	for _, l := range listeners {
@@ -133,6 +137,7 @@ func (p *Pubsub) Start() {
 			logrus.WithError(err).Info("redplex/pubsub: error dialing to pubsub master")
 			select {
 			case <-time.After(backoff.NextBackOff()):
+				serverReconnects.Inc()
 				continue
 			case <-p.closer:
 				return
