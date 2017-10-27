@@ -97,6 +97,8 @@ func (l listenerMap) removeAll(conn Writable) (toUnsub [][]byte) {
 		if len(list) == 0 {
 			delete(l, channel)
 			toUnsub = append(toUnsub, []byte(channel))
+		} else {
+			l[channel] = list
 		}
 	}
 
