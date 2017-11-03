@@ -1,13 +1,11 @@
 package redplex
 
 import (
-	"time"
-
 	"bufio"
 	"bytes"
 	"net"
-
 	"sync"
+	"time"
 
 	"github.com/cenkalti/backoff"
 	"github.com/sirupsen/logrus"
@@ -299,10 +297,12 @@ func (p *Pubsub) read(cnx net.Conn) error {
 			continue // expected, we can get replies from subscriptions, which we'll ignore
 		}
 
+		p.mu.Lock()
 		if parsed.IsPattern {
 			p.patterns.broadcast(parsed.ChannelOrPattern, bytes)
 		} else {
 			p.channels.broadcast(parsed.ChannelOrPattern, bytes)
 		}
+		p.mu.Unlock()
 	}
 }

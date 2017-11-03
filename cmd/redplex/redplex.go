@@ -30,7 +30,6 @@ var (
 
 func main() {
 	kingpin.Parse()
-
 	level, err := logrus.ParseLevel(*logLevel)
 	if err != nil {
 		logrus.WithError(err).Fatal("redplex/main: error parsing log level")
