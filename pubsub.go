@@ -105,7 +105,7 @@ func (l listenerMap) removeAll(conn Writable) (toUnsub [][]byte) {
 
 // Pubsub manages the connection of redplex to the remote pubsub server.
 type Pubsub struct {
-	dial         Dialer
+	dialer       Dialer
 	closer       chan struct{}
 	writeTimeout time.Duration
 
@@ -118,7 +118,7 @@ type Pubsub struct {
 // NewPubsub creates a new Pubsub instance.
 func NewPubsub(dialer Dialer, writeTimeout time.Duration) *Pubsub {
 	return &Pubsub{
-		dial:         dialer,
+		dialer:       dialer,
 		writeTimeout: writeTimeout,
 		patterns:     listenerMap{},
 		channels:     listenerMap{},
@@ -132,7 +132,7 @@ func (p *Pubsub) Start() {
 	backoff.MaxInterval = time.Second * 10
 
 	for {
-		cnx, err := p.dial()
+		cnx, err := p.dialer.Dial()
 		if err != nil {
 			logrus.WithError(err).Info("redplex/pubsub: error dialing to pubsub master")
 			select {
@@ -232,7 +232,7 @@ func (p *Pubsub) UnsubscribeAll(c Writable) {
 	p.mu.Unlock()
 }
 
-// command sends the request to the pubsub server asynchonrously.
+// command sends the request to the pubsub server asynchronously.
 func (p *Pubsub) command(r *Request) {
 	if p.connection != nil {
 		p.connection.SetWriteDeadline(time.Now().Add(p.writeTimeout))

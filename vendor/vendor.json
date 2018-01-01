@@ -3,12 +3,6 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "Ba9moJKp0ssS+S7v2Zhl0zVmV6U=",
-			"path": "github.com/FZambia/go-sentinel",
-			"revision": "7ec87ec3f92e789de83d4d4a17a5cd069bd2882f",
-			"revisionTime": "2017-09-08T19:10:20Z"
-		},
-		{
 			"checksumSHA1": "KmjnydoAbofMieIWm+it5OWERaM=",
 			"path": "github.com/alecthomas/template",
 			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",

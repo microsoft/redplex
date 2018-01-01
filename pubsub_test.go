@@ -1,14 +1,11 @@
 package redplex
 
 import (
-	"testing"
-
-	"net"
-	"time"
-
-	"sync"
-
 	"io"
+	"net"
+	"sync"
+	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -108,7 +105,7 @@ func (p *PubsubSuite) SetupSuite() {
 
 func (p *PubsubSuite) SetupTest() {
 	p.pubsub = NewPubsub(
-		func() (net.Conn, error) { return net.Dial("tcp", p.server.Addr().String()) },
+		NewDirectDialer("tcp", p.server.Addr().String(), 0),
 		time.Second,
 	)
 

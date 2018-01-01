@@ -8,8 +8,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/FZambia/go-sentinel"
-	"github.com/garyburd/redigo/redis"
 	"github.com/mixer/redplex"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -20,6 +18,7 @@ var (
 	address        = kingpin.Flag("listen", "Address to listen on").Short('l').Default("127.0.0.1:3000").String()
 	network        = kingpin.Flag("network", "Network to listen on").Short('n').Default("tcp").String()
 	remote         = kingpin.Flag("remote", "Remote address of the Redis server").Default("127.0.0.1:6379").String()
+	remoteNetwork  = kingpin.Flag("remote-network", "Remote network to dial through (usually tcp or tcp6)").Default("tcp").String()
 	sentinels      = kingpin.Flag("sentinels", "A list of Redis sentinel addresses").Strings()
 	sentinelMaster = kingpin.Flag("sentinel-name", "The name of the sentinel master").String()
 	logLevel       = kingpin.Flag("log-level", "Log level (one of debug, info, warn, error").Default("info").String()
@@ -46,9 +45,9 @@ func main() {
 
 	var dialer redplex.Dialer
 	if *sentinelMaster != "" {
-		dialer = dialSentinel
+		dialer = redplex.NewSentinelDialer(*remoteNetwork, *sentinels, *sentinelMaster, *dialTimeout)
 	} else {
-		dialer = dialSingle
+		dialer = redplex.NewDirectDialer(*remoteNetwork, *remote, *dialTimeout)
 	}
 
 	closed := make(chan struct{})
@@ -87,27 +86,4 @@ func awaitInterrupt() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, syscall.SIGINT)
 	<-interrupt
-}
-
-func dialSingle() (net.Conn, error) { return dialToAddress(*remote) }
-
-func dialToAddress(addr string) (net.Conn, error) {
-	return net.DialTimeout("tcp", addr, *dialTimeout)
-}
-
-func dialSentinel() (net.Conn, error) {
-	snt := &sentinel.Sentinel{
-		Addrs:      *sentinels,
-		MasterName: *sentinelMaster,
-		Dial: func(addr string) (redis.Conn, error) {
-			return redis.Dial("tcp", addr, redis.DialConnectTimeout(*dialTimeout))
-		},
-	}
-
-	master, err := snt.MasterAddr()
-	if err != nil {
-		return nil, err
-	}
-
-	return dialToAddress(master)
 }

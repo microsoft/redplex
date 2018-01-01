@@ -13,10 +13,6 @@ import (
 // buffer on the outgoing connection.
 const toSendQueueLimit = 128
 
-// Dialer is passed into redplex. Calling it should create a new connection to
-// the pubsub master.
-type Dialer func() (net.Conn, error)
-
 // Server is the redplex server which accepts connections and talks to the
 // underlying Pubsub implementation.
 type Server struct {
