@@ -42,7 +42,7 @@ func main() {
 
 	start := make(chan struct{})
 	go serveBenchRemote(benchListener, start)
-	go redplex.NewServer(redplexListener, redplex.NewPubsub(dialer, time.Second)).Listen()
+	go redplex.NewServer(redplexListener, redplex.NewPubsub(redplex.NewDirectDialer(remoteAddress, 0), time.Second)).Listen()
 
 	f, _ := os.Create("cpu.profile")
 	pprof.StartCPUProfile(f)
@@ -124,5 +124,3 @@ func serveBenchRemote(l net.Listener, start <-chan struct{}) {
 		cnx.Write(toWrite)
 	}
 }
-
-func dialer() (net.Conn, error) { return net.Dial("tcp", remoteAddress) }
