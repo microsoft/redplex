@@ -1,9 +1,12 @@
 package redplex
 
 import (
+	"crypto/tls"
 	"net"
 	"time"
 
+	"bufio"
+	"errors"
 	"fmt"
 
 	"github.com/cenkalti/backoff"
@@ -23,48 +26,86 @@ const defaultTimeout = time.Second * 5
 
 // DirectDialer creates a direct connection to a single Redis server or IP.
 type DirectDialer struct {
-	network string
-	address string
-	timeout time.Duration
+	network  string
+	address  string
+	password string
+	useTLS   bool
+	timeout  time.Duration
 }
 
 // NewDirectDialer creates a DirectDialer that dials to the given address.
 // If the timeout is 0, a default value of 5 seconds will be used.
-func NewDirectDialer(network string, address string, timeout time.Duration) DirectDialer {
+func NewDirectDialer(network string, address string, password string, useTLS bool, timeout time.Duration) DirectDialer {
 	if timeout == 0 {
 		timeout = defaultTimeout
 	}
 
-	return DirectDialer{network, address, timeout}
+	return DirectDialer{network, address, password, useTLS, timeout}
 }
 
 // Dial implements Dialer.Dial
-func (d DirectDialer) Dial() (net.Conn, error) {
-	return net.DialTimeout(d.network, d.address, d.timeout)
+func (d DirectDialer) Dial() (cnx net.Conn, err error) {
+	if d.useTLS {
+		dialer := new(net.Dialer)
+		dialer.Timeout = d.timeout
+		cnx, err = tls.DialWithDialer(dialer, d.network, d.address, nil)
+	} else {
+		cnx, err = net.DialTimeout(d.network, d.address, d.timeout)
+	}
+
+	if err != nil {
+		return
+	}
+
+	if d.password != "" {
+		line := "*2\r\n$4\r\nAUTH\n\n$" + string(len(d.password)) + "\r\n" + d.password + "\r\n"
+		_, err = cnx.Write([]byte(line))
+		if err != nil {
+			return
+		}
+
+		reader := bufio.NewReader(cnx)
+
+		line, err = reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+
+		if line[0] != '+' {
+			err = errors.New(line[1:])
+		}
+	}
+	return
 }
 
 // The SentinelDialer dials into the Redis cluster master as defined by
 // the assortment of sentinel servers.
 type SentinelDialer struct {
-	network    string
-	sentinels  []string
-	masterName string
-	timeout    time.Duration
-	closer     chan<- struct{}
+	network          string
+	sentinels        []string
+	masterName       string
+	password         string
+	sentinelPassword string
+	useTLS           bool
+	timeout          time.Duration
+	closer           chan<- struct{}
 }
 
 // NewSentinelDialer creates a SentinelDialer.
-func NewSentinelDialer(network string, sentinels []string, masterName string, timeout time.Duration) *SentinelDialer {
+func NewSentinelDialer(network string, sentinels []string, masterName string, password string, sentinelPassword string, useTLS bool, timeout time.Duration) *SentinelDialer {
 	if timeout == 0 {
 		timeout = defaultTimeout
 	}
 
 	return &SentinelDialer{
-		network:    network,
-		sentinels:  sentinels,
-		masterName: masterName,
-		timeout:    timeout,
-		closer:     make(chan struct{}),
+		network:          network,
+		sentinels:        sentinels,
+		masterName:       masterName,
+		password:         password,
+		sentinelPassword: sentinelPassword,
+		useTLS:           useTLS,
+		timeout:          timeout,
+		closer:           make(chan struct{}),
 	}
 }
 
@@ -83,7 +124,7 @@ func (s *SentinelDialer) Dial() (net.Conn, error) {
 		return nil, err
 	}
 
-	cnx, err := DirectDialer{s.network, master, s.timeout}.Dial()
+	cnx, err := DirectDialer{s.network, master, s.password, s.useTLS, s.timeout}.Dial()
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +268,15 @@ func (s *SentinelDialer) doUntilSuccess(fn func(conn redis.Conn) (interface{}, e
 	var cnx redis.Conn
 
 	for _, addr := range s.sentinels {
-		cnx, err = redis.Dial(s.network, addr, redis.DialConnectTimeout(s.timeout))
+		options := []redis.DialOption{
+			redis.DialConnectTimeout(s.timeout),
+			redis.DialUseTLS(s.useTLS),
+		}
+
+		if s.sentinelPassword != "" {
+			options = append(options, redis.DialPassword(s.sentinelPassword))
+		}
+		cnx, err = redis.Dial(s.network, addr, options...)
 		if err != nil {
 			continue
 		}
