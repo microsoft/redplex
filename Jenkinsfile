@@ -20,7 +20,7 @@ node {
             }
             stage("Prepare") {
                 sh 'go get github.com/kardianos/govendor'
-                sh 'go get github.com/golang/lint/golint'
+                sh 'go get golang.org/x/lint/golint'
                 sh 'govendor sync'
             }
             stage("Test") {
