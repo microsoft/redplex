@@ -28,7 +28,7 @@ func (e *EndToEndServerSuite) SetupSuite() {
 	require.Nil(e.T(), err)
 
 	e.server = NewServer(listener, NewPubsub(
-		NewDirectDialer("tcp", redisAddress, 0),
+		NewDirectDialer("tcp", redisAddress, "", false, 0),
 		time.Second*5,
 	))
 	go e.server.Listen()
