@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"bufio"
-	"errors"
 	"fmt"
 
 	"github.com/cenkalti/backoff"
@@ -45,12 +44,14 @@ func NewDirectDialer(network string, address string, password string, useTLS boo
 
 // Dial implements Dialer.Dial
 func (d DirectDialer) Dial() (cnx net.Conn, err error) {
+	dialer := &net.Dialer{
+		Timeout: d.timeout,
+	}
+
 	if d.useTLS {
-		dialer := new(net.Dialer)
-		dialer.Timeout = d.timeout
 		cnx, err = tls.DialWithDialer(dialer, d.network, d.address, nil)
 	} else {
-		cnx, err = net.DialTimeout(d.network, d.address, d.timeout)
+		cnx, err = dialer.Dial(d.network, d.address)
 	}
 
 	if err != nil {
@@ -58,7 +59,7 @@ func (d DirectDialer) Dial() (cnx net.Conn, err error) {
 	}
 
 	if d.password != "" {
-		line := "*2\r\n$4\r\nAUTH\n\n$" + string(len(d.password)) + "\r\n" + d.password + "\r\n"
+		line := fmt.Sprintf("*2\r\n$4\r\nAUTH\n\n$%d\r\n%s\r\n", len(d.password), d.password)
 		_, err = cnx.Write([]byte(line))
 		if err != nil {
 			return
@@ -72,7 +73,7 @@ func (d DirectDialer) Dial() (cnx net.Conn, err error) {
 		}
 
 		if line[0] != '+' {
-			err = errors.New(line[1:])
+			err = fmt.Errorf("Error authenticating to redis: %s", line)
 		}
 	}
 	return
