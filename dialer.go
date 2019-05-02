@@ -54,28 +54,27 @@ func (d DirectDialer) Dial() (cnx net.Conn, err error) {
 		cnx, err = dialer.Dial(d.network, d.address)
 	}
 
+	if err != nil || d.password == "" {
+		return
+	}
+
+	line := fmt.Sprintf("*2\r\n$4\r\nAUTH\n\n$%d\r\n%s\r\n", len(d.password), d.password)
+	_, err = cnx.Write([]byte(line))
 	if err != nil {
 		return
 	}
 
-	if d.password != "" {
-		line := fmt.Sprintf("*2\r\n$4\r\nAUTH\n\n$%d\r\n%s\r\n", len(d.password), d.password)
-		_, err = cnx.Write([]byte(line))
-		if err != nil {
-			return
-		}
+	reader := bufio.NewReader(cnx)
 
-		reader := bufio.NewReader(cnx)
-
-		line, err = reader.ReadString('\n')
-		if err != nil {
-			return
-		}
-
-		if line[0] != '+' {
-			err = fmt.Errorf("Error authenticating to redis: %s", line)
-		}
+	line, err = reader.ReadString('\n')
+	if err != nil {
+		return
 	}
+
+	if line[0] != '+' {
+		err = fmt.Errorf("Error authenticating to redis: %s", line)
+	}
+
 	return
 }
 
