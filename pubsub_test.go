@@ -105,7 +105,7 @@ func (p *PubsubSuite) SetupSuite() {
 
 func (p *PubsubSuite) SetupTest() {
 	p.pubsub = NewPubsub(
-		NewDirectDialer("tcp", p.server.Addr().String(), 0),
+		NewDirectDialer("tcp", p.server.Addr().String(), "", false, 0),
 		time.Second,
 	)
 

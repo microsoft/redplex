@@ -19,6 +19,7 @@ var (
 	network        = kingpin.Flag("network", "Network to listen on").Short('n').Default("tcp").String()
 	remote         = kingpin.Flag("remote", "Remote address of the Redis server").Default("127.0.0.1:6379").String()
 	remoteNetwork  = kingpin.Flag("remote-network", "Remote network to dial through (usually tcp or tcp6)").Default("tcp").String()
+	useTLS         = kingpin.Flag("use-tls", "Use TLS to connect to redis").Default("false").Bool()
 	sentinels      = kingpin.Flag("sentinels", "A list of Redis sentinel addresses").Strings()
 	sentinelMaster = kingpin.Flag("sentinel-name", "The name of the sentinel master").String()
 	logLevel       = kingpin.Flag("log-level", "Log level (one of debug, info, warn, error").Default("info").String()
@@ -28,6 +29,11 @@ var (
 )
 
 func main() {
+	kingpin.UsageTemplate(kingpin.DefaultUsageTemplate + "\r\n" +
+		"Environment variables:\r\n" +
+		"REDIS_PASSWORD: Password for the redis server\r\n" +
+		"SENTINEL_PASSWORD: Password for the sentinel server(s)")
+
 	kingpin.Parse()
 	level, err := logrus.ParseLevel(*logLevel)
 	if err != nil {
@@ -43,11 +49,14 @@ func main() {
 
 	logrus.SetLevel(level)
 
+	password := os.Getenv("REDIS_PASSWORD")
+	sentinelPassword := os.Getenv("SENTINEL_PASSWORD")
+
 	var dialer redplex.Dialer
 	if *sentinelMaster != "" {
-		dialer = redplex.NewSentinelDialer(*remoteNetwork, *sentinels, *sentinelMaster, *dialTimeout)
+		dialer = redplex.NewSentinelDialer(*remoteNetwork, *sentinels, *sentinelMaster, password, sentinelPassword, *useTLS, *dialTimeout)
 	} else {
-		dialer = redplex.NewDirectDialer(*remoteNetwork, *remote, *dialTimeout)
+		dialer = redplex.NewDirectDialer(*remoteNetwork, *remote, password, *useTLS, *dialTimeout)
 	}
 
 	closed := make(chan struct{})
