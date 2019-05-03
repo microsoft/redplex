@@ -30,8 +30,9 @@ var (
 
 func main() {
 	kingpin.UsageTemplate(kingpin.DefaultUsageTemplate + "\r\n" +
-		"Use environment variable REDIS_PASSWORD to provide a password for the redis server\r\n" +
-		"Use SENTINEL_PASSWORD to provide a password for the sentinel server(s)")
+		"Environment variables:\r\n" +
+		"REDIS_PASSWORD: Password for the redis server\r\n" +
+		"SENTINEL_PASSWORD: Password for the sentinel server(s)")
 
 	kingpin.Parse()
 	level, err := logrus.ParseLevel(*logLevel)
