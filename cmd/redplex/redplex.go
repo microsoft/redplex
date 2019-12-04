@@ -18,6 +18,9 @@ var (
 	address        = kingpin.Flag("listen", "Address to listen on").Short('l').Default("127.0.0.1:3000").String()
 	network        = kingpin.Flag("network", "Network to listen on").Short('n').Default("tcp").String()
 	remote         = kingpin.Flag("remote", "Remote address of the Redis server").Default("127.0.0.1:6379").String()
+	remoteEnv      = kingpin.Flag("remote-env", "Environment variable for --remote").Default("").String()
+	passwordEnv    = kingpin.Flag("password-env", "Environment variable for redis password").Default("REDIS_PASSWORD").String()
+	sentinelEnv    = kingpin.Flag("sentinel-env", "Environment variable for sentinel password").Default("SENTINEL_PASSWORD").String()
 	remoteNetwork  = kingpin.Flag("remote-network", "Remote network to dial through (usually tcp or tcp6)").Default("tcp").String()
 	useTLS         = kingpin.Flag("use-tls", "Use TLS to connect to redis").Default("false").Bool()
 	sentinels      = kingpin.Flag("sentinels", "A list of Redis sentinel addresses").Strings()
@@ -29,10 +32,7 @@ var (
 )
 
 func main() {
-	kingpin.UsageTemplate(kingpin.DefaultUsageTemplate + "\r\n" +
-		"Environment variables:\r\n" +
-		"REDIS_PASSWORD: Password for the redis server\r\n" +
-		"SENTINEL_PASSWORD: Password for the sentinel server(s)")
+	kingpin.UsageTemplate(kingpin.DefaultUsageTemplate)
 
 	kingpin.Parse()
 	level, err := logrus.ParseLevel(*logLevel)
@@ -49,14 +49,19 @@ func main() {
 
 	logrus.SetLevel(level)
 
-	password := os.Getenv("REDIS_PASSWORD")
-	sentinelPassword := os.Getenv("SENTINEL_PASSWORD")
+	password := os.Getenv(*passwordEnv)
+	sentinelPassword := os.Getenv(*sentinelEnv)
 
 	var dialer redplex.Dialer
 	if *sentinelMaster != "" {
 		dialer = redplex.NewSentinelDialer(*remoteNetwork, *sentinels, *sentinelMaster, password, sentinelPassword, *useTLS, *dialTimeout)
 	} else {
-		dialer = redplex.NewDirectDialer(*remoteNetwork, *remote, password, *useTLS, *dialTimeout)
+		useRemote := *remote
+		useRemoveEnv := *remoteEnv
+		if useRemoveEnv != "" {
+			useRemote = os.Getenv(useRemoveEnv)
+		}
+		dialer = redplex.NewDirectDialer(*remoteNetwork, useRemote, password, *useTLS, *dialTimeout)
 	}
 
 	closed := make(chan struct{})
