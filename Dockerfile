@@ -7,6 +7,6 @@ RUN go get github.com/kardianos/govendor && \
     ${GOPATH}/bin/govendor sync && \
     make redplex
 
-FROM node:10-buster
+FROM node:8-buster
 
 COPY --from=builder /opt/app/go/src/github.com/mixer/redplex/redplex /usr/local/bin/redplex
