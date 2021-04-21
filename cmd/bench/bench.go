@@ -12,7 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/mixer/redplex"
+	"github.com/microsoft/redplex"
 	"github.com/sirupsen/logrus"
 )
 

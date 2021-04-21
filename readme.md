@@ -1,10 +1,10 @@
 # redplex
 
-Project status: redplex is actively maintained and has been running in production at Mixer since December 2017.
+Project status: redplex is actively maintained and was running in production at [Mixer](https://en.wikipedia.org/wiki/Mixer_(service)) from 2017 to 2021.
 
 redplex is a tool to multiplex Redis pubsub. It implements the Redis protocol and is a drop-in replacement for existing Redis pubsub servers, simply boot redplex and change your port number. This is a useful tool in situations where you have very many readers for pubsub events, as Redis pubsub throughput is inversely proportional to the number of subscribers for the event.
 
-> Note: some Redis clients have health checks that call commands like INFO on boot. You'll want to turn these off, as redplex does not implement commands expect for SUBSCRIBE, PSUBSCRIBE, UNSUBSCRIBE, PUNSUBSCRIBE, and EXIT. 
+> Note: some Redis clients have health checks that call commands like INFO on boot. You'll want to turn these off, as redplex does not implement commands expect for SUBSCRIBE, PSUBSCRIBE, UNSUBSCRIBE, PUNSUBSCRIBE, and EXIT.
 
 ### Usage
 
